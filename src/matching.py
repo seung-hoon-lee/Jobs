@@ -15,6 +15,7 @@ DDAY_WEIGHT = 0.4
 NULL_DEADLINE_URGENCY = 0.3
 DDAY_URGENCY_WINDOW_DAYS = 30
 TOP_N = 10
+CAREER_LEVEL_ANY = "경력무관"
 
 
 def _parse_deadline(deadline_str: Optional[str]) -> Optional[date]:
@@ -34,7 +35,14 @@ def _matched_keywords(candidate: JobPosting, keywords: List[str]) -> List[str]:
 def _passes_filters(candidate: JobPosting, config: UserConfig, matched_keywords: List[str]) -> bool:
     if not matched_keywords:
         return False
-    if config.career_levels and candidate.career_level not in config.career_levels:
+    # A posting labeled "경력무관" (any career level accepted) must satisfy any
+    # configured 경력 filter -- it's the posting's own claim that it's open to
+    # every level, not a distinct level of its own to be matched exactly.
+    if (
+        config.career_levels
+        and candidate.career_level != CAREER_LEVEL_ANY
+        and candidate.career_level not in config.career_levels
+    ):
         return False
     # candidate.region is a short exact label for some sources ("서울") but a
     # compound/full-address string for others (사람인 "경기 성남시", 관심기업's

@@ -107,6 +107,14 @@ def test_optional_career_level_filter_excludes_mismatch():
     assert score_and_rank([posting], config, TODAY) == []
 
 
+def test_career_level_any_passes_regardless_of_filter():
+    # "경력무관" is the posting's claim that it accepts every career level,
+    # not a level of its own -- it must pass any configured 경력 filter.
+    config = _config(keywords=["python"], career_levels=["신입"])
+    posting = _posting(title="Python 개발자", career_level="경력무관")
+    assert len(score_and_rank([posting], config, TODAY)) == 1
+
+
 def test_optional_region_filter_allows_match():
     config = _config(keywords=["python"], regions=["서울"])
     posting = _posting(title="Python 개발자", region="서울")
