@@ -86,17 +86,23 @@ def load_feed_state(notion_token: str, feed_db_id: str) -> FeedState:
     archived_pages: List[dict] = []
     try:
         archived_pages = _query_all_pages(client, feed_db_id, is_archived=True)
-    except APIResponseError:
+        logger.info("DEBUG archived-page query returned %d raw pages", len(archived_pages))
+        if archived_pages:
+            logger.info("DEBUG sample archived page keys: %s", sorted(archived_pages[0].keys()))
+            logger.info("DEBUG sample archived page: %s", archived_pages[0])
+    except APIResponseError as exc:
         logger.warning(
-            "Archived-page query (is_archived=True) failed against %s; "
+            "Archived-page query (is_archived=True) failed against %s: %s; "
             "continuing with active rows only for this run.",
-            feed_db_id,
+            feed_db_id, exc,
         )
 
     by_url: Dict[str, dict] = {}
     for page in active_pages + archived_pages:
         url = _extract_url(page, LINK_PROPERTY)
         if not url:
+            if page in archived_pages:
+                logger.info("DEBUG archived page with no extractable URL: %s", page.get("id"))
             continue
         by_url[url] = {
             "notion_page_id": page["id"],
