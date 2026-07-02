@@ -18,30 +18,22 @@ def _page(page_id, url, source, is_archived=False, deadline=None, status=None, l
     }
 
 
-def test_active_and_archived_rows_are_both_indexed_by_url():
+def test_active_rows_are_indexed_by_url():
     active_page = _page("p-active", "https://example.com/1", "원티드", deadline="2026-07-10", status="모집중")
-    archived_page = _page("p-archived", "https://example.com/2", "사람인", is_archived=True, status="마감")
 
     client = MagicMock()
-
-    def fake_query(data_source_id, page_size, **body):
-        if body.get("is_archived"):
-            return {"results": [archived_page], "has_more": False}
-        return {"results": [active_page], "has_more": False}
-
-    client.data_sources.query.side_effect = fake_query
+    client.data_sources.query.return_value = {"results": [active_page], "has_more": False}
 
     with patch("src.feed_state.Client", return_value=client):
         state = load_feed_state("token", "feed-db")
 
-    assert set(state.by_url) == {"https://example.com/1", "https://example.com/2"}
+    assert set(state.by_url) == {"https://example.com/1"}
     assert state.by_url["https://example.com/1"]["is_archived"] is False
     assert state.by_url["https://example.com/1"]["source"] == "원티드"
-    assert state.by_url["https://example.com/2"]["is_archived"] is True
 
     # Confirms the earlier databases.query -> data_sources.query fix: must call
     # with data_source_id, not database_id.
-    client.data_sources.query.assert_any_call(data_source_id="feed-db", page_size=100)
+    client.data_sources.query.assert_called_once_with(data_source_id="feed-db", page_size=100)
 
 
 def test_pagination_follows_next_cursor():
@@ -52,8 +44,6 @@ def test_pagination_follows_next_cursor():
     call_count = {"n": 0}
 
     def fake_query(data_source_id, page_size, **body):
-        if body.get("is_archived"):
-            return {"results": [], "has_more": False}
         call_count["n"] += 1
         if call_count["n"] == 1:
             assert "start_cursor" not in body
@@ -68,29 +58,6 @@ def test_pagination_follows_next_cursor():
 
     assert len(state.by_url) == 2
     assert call_count["n"] == 2
-
-
-def test_archived_query_failure_falls_back_to_active_only():
-    from notion_client.errors import APIErrorCode, APIResponseError
-    import httpx
-
-    active_page = _page("p-active", "https://example.com/1", "원티드")
-    client = MagicMock()
-
-    def fake_query(data_source_id, page_size, **body):
-        if body.get("is_archived"):
-            raise APIResponseError(
-                code=APIErrorCode.ValidationError, status=400, message="unsupported",
-                headers=httpx.Headers(), raw_body_text="{}",
-            )
-        return {"results": [active_page], "has_more": False}
-
-    client.data_sources.query.side_effect = fake_query
-
-    with patch("src.feed_state.Client", return_value=client):
-        state = load_feed_state("token", "feed-db")  # must not raise
-
-    assert set(state.by_url) == {"https://example.com/1"}
 
 
 def test_pages_missing_link_url_are_skipped():

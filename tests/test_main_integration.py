@@ -57,13 +57,9 @@ def test_full_pipeline_dedupes_creates_unarchives_and_archives():
     existing_archived = _feed_page("https://x/archived-1", "사람인", is_archived=True)
 
     feed_client = MagicMock()
-
-    def fake_feed_query(data_source_id, page_size, **body):
-        if body.get("is_archived"):
-            return {"results": [existing_archived], "has_more": False}
-        return {"results": [existing_active], "has_more": False}
-
-    feed_client.data_sources.query.side_effect = fake_feed_query
+    feed_client.data_sources.query.return_value = {
+        "results": [existing_active, existing_archived], "has_more": False,
+    }
 
     new_posting = JobPosting(
         title="백엔드 신규공고", company="테스트컴퍼니", url="https://x/new-1",

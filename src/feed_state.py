@@ -1,18 +1,26 @@
-"""Loads existing "추천 공고" feed rows (active + archived) indexed by URL.
+"""Loads existing "추천 공고" feed rows indexed by URL.
 
 This is Stage 0 of the pipeline -- every later stage (discovery/liveness/
 matching/sync) reads from the FeedState this module returns.
+
+Archived (trashed) rows cannot be loaded here: Notion's public API has no
+supported way to query them. `data_sources.query`'s `in_trash` parameter is
+rejected outright ("should be not present"), and `is_archived` is silently
+accepted but has no filtering effect -- verified live, it returns the same
+active pages `in_trash`/`archived` omitted would return. The Search API
+doesn't expose a trash filter either (confirmed against its documented body
+parameters). So a previously-archived URL that gets rediscovered will be
+created as a new page rather than un-archived; the archived_rediscovered /
+un_archived code paths downstream (main.py, notion_sync.py) stay in place in
+case Notion adds API support for this later, but they are currently
+unreachable in production.
 """
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 from notion_client import Client
-from notion_client.errors import APIResponseError
-
-logger = logging.getLogger(__name__)
 
 LINK_PROPERTY = "링크"
 DEADLINE_PROPERTY = "마감일"
@@ -83,26 +91,10 @@ def load_feed_state(notion_token: str, feed_db_id: str) -> FeedState:
 
     active_pages = _query_all_pages(client, feed_db_id)
 
-    archived_pages: List[dict] = []
-    try:
-        archived_pages = _query_all_pages(client, feed_db_id, is_archived=True)
-        logger.info("DEBUG archived-page query returned %d raw pages", len(archived_pages))
-        if archived_pages:
-            logger.info("DEBUG sample archived page keys: %s", sorted(archived_pages[0].keys()))
-            logger.info("DEBUG sample archived page: %s", archived_pages[0])
-    except APIResponseError as exc:
-        logger.warning(
-            "Archived-page query (is_archived=True) failed against %s: %s; "
-            "continuing with active rows only for this run.",
-            feed_db_id, exc,
-        )
-
     by_url: Dict[str, dict] = {}
-    for page in active_pages + archived_pages:
+    for page in active_pages:
         url = _extract_url(page, LINK_PROPERTY)
         if not url:
-            if page in archived_pages:
-                logger.info("DEBUG archived page with no extractable URL: %s", page.get("id"))
             continue
         by_url[url] = {
             "notion_page_id": page["id"],
