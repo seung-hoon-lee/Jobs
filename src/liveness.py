@@ -16,7 +16,14 @@ from src.feed_state import FeedState
 
 REQUEST_TIMEOUT_SECONDS = 10
 
-CLOSURE_MARKERS = ["마감", "채용이 종료", "모집이 종료", "공고가 만료"]
+# "마감" alone is deliberately excluded: it's a substring of routine labels
+# every detail page renders regardless of status ("마감일" deadline-date
+# field, "마감기한" deadline-period copy, GreetingHR's static help text that
+# ships in the page bundle for every opening) -- verified live against three
+# genuinely open GreetingHR postings, all of which contain "마감" in
+# boilerplate. Only phrases specific enough to not double as routine UI copy
+# belong here.
+CLOSURE_MARKERS = ["채용이 종료", "모집이 종료", "공고가 만료"]
 
 RECHECK_DEADLINE_THRESHOLD_DAYS = 7
 NULL_DEADLINE_RECHECK_CADENCE_DAYS = 7

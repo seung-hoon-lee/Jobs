@@ -28,12 +28,24 @@ def test_check_closed_410_is_closed():
 
 
 def test_check_closed_200_with_closure_marker_is_closed():
-    with patch("src.liveness.requests.get", return_value=_FakeResponse(200, text="<html>이 채용은 마감 되었습니다</html>")):
+    with patch("src.liveness.requests.get", return_value=_FakeResponse(200, text="<html>채용이 종료되었습니다</html>")):
         assert check_closed("https://x.com/job") is True
 
 
 def test_check_closed_200_normal_content_is_not_closed():
     with patch("src.liveness.requests.get", return_value=_FakeResponse(200, text="<html>백엔드 엔지니어 채용중</html>")):
+        assert check_closed("https://x.com/job") is False
+
+
+def test_check_closed_200_with_bare_deadline_label_is_not_closed():
+    # "마감" alone is NOT a closure marker: it's a substring of routine
+    # deadline-date labels ("마감일") that render on open postings too --
+    # verified live against real GreetingHR pages that embed this in
+    # boilerplate regardless of the posting's actual status.
+    with patch(
+        "src.liveness.requests.get",
+        return_value=_FakeResponse(200, text="<html>마감일: 2026-08-01, 마감기한 안내</html>"),
+    ):
         assert check_closed("https://x.com/job") is False
 
 
