@@ -1,0 +1,5 @@
+notion-client
+requests
+beautifulsoup4
+python-dateutil
+pytest

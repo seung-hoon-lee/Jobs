@@ -1,0 +1,9 @@
+.omc/
+.DS_Store
+__pycache__/
+*.pyc
+.env
+venv/
+.venv/
+.claude/settings.local.json
+.pytest_cache/

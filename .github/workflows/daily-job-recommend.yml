@@ -1,0 +1,31 @@
+name: Daily Job Recommendation
+
+on:
+  schedule:
+    # 06:55 KST (plan's revised buffer -- GitHub Actions schedules only ever
+    # run late, never early, so this lands the run inside the 07:00-08:00 KST
+    # window even with typical scheduling delay).
+    - cron: "55 21 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run recommendation pipeline
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          RECOMMENDATION_DB_ID: ${{ secrets.RECOMMENDATION_DB_ID }}
+          CONFIG_DB_ID: ${{ secrets.CONFIG_DB_ID }}
+        run: python main.py
