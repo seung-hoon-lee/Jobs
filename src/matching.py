@@ -36,7 +36,11 @@ def _passes_filters(candidate: JobPosting, config: UserConfig, matched_keywords:
         return False
     if config.career_levels and candidate.career_level not in config.career_levels:
         return False
-    if config.regions and candidate.region not in config.regions:
+    # candidate.region is a short exact label for some sources ("서울") but a
+    # compound/full-address string for others (사람인 "경기 성남시", 관심기업's
+    # GreetingHR full postal address) -- containment, not equality, is the
+    # only check that works across all of them.
+    if config.regions and not any(region in candidate.region for region in config.regions):
         return False
     if config.employment_types and candidate.employment_type not in config.employment_types:
         return False

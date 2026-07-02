@@ -113,6 +113,24 @@ def test_optional_region_filter_allows_match():
     assert len(score_and_rank([posting], config, TODAY)) == 1
 
 
+def test_optional_region_filter_allows_compound_region_containing_label():
+    # 사람인/잡코리아 ("경기 성남시") and 관심기업 (full postal address) sources
+    # populate region with more than the bare label the Settings DB offers --
+    # containment, not exact equality, must decide the match.
+    config = _config(keywords=["python"], regions=["경기"])
+    posting = _posting(
+        title="Python 개발자",
+        region="대한민국 경기도 성남시 판교역로241번길 20",
+    )
+    assert len(score_and_rank([posting], config, TODAY)) == 1
+
+
+def test_optional_region_filter_excludes_non_matching_compound_region():
+    config = _config(keywords=["python"], regions=["서울"])
+    posting = _posting(title="Python 개발자", region="부산 해운대구")
+    assert score_and_rank([posting], config, TODAY) == []
+
+
 def test_empty_optional_filters_allow_everything():
     config = _config(keywords=["python"])  # career/region/employment all empty -> unrestricted
     posting = _posting(title="Python 개발자", region="아무데나", career_level="아무거나")
