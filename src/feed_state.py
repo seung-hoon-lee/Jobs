@@ -85,10 +85,10 @@ def load_feed_state(notion_token: str, feed_db_id: str) -> FeedState:
 
     archived_pages: List[dict] = []
     try:
-        archived_pages = _query_all_pages(client, feed_db_id, in_trash=True)
+        archived_pages = _query_all_pages(client, feed_db_id, is_archived=True)
     except APIResponseError:
         logger.warning(
-            "Archived-page query (in_trash=True) failed against %s; "
+            "Archived-page query (is_archived=True) failed against %s; "
             "continuing with active rows only for this run.",
             feed_db_id,
         )

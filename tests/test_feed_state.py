@@ -25,7 +25,7 @@ def test_active_and_archived_rows_are_both_indexed_by_url():
     client = MagicMock()
 
     def fake_query(data_source_id, page_size, **body):
-        if body.get("in_trash"):
+        if body.get("is_archived"):
             return {"results": [archived_page], "has_more": False}
         return {"results": [active_page], "has_more": False}
 
@@ -52,7 +52,7 @@ def test_pagination_follows_next_cursor():
     call_count = {"n": 0}
 
     def fake_query(data_source_id, page_size, **body):
-        if body.get("in_trash"):
+        if body.get("is_archived"):
             return {"results": [], "has_more": False}
         call_count["n"] += 1
         if call_count["n"] == 1:
@@ -78,7 +78,7 @@ def test_archived_query_failure_falls_back_to_active_only():
     client = MagicMock()
 
     def fake_query(data_source_id, page_size, **body):
-        if body.get("in_trash"):
+        if body.get("is_archived"):
             raise APIResponseError(
                 code=APIErrorCode.ValidationError, status=400, message="unsupported",
                 headers=httpx.Headers(), raw_body_text="{}",

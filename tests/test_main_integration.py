@@ -59,7 +59,7 @@ def test_full_pipeline_dedupes_creates_unarchives_and_archives():
     feed_client = MagicMock()
 
     def fake_feed_query(data_source_id, page_size, **body):
-        if body.get("in_trash"):
+        if body.get("is_archived"):
             return {"results": [existing_archived], "has_more": False}
         return {"results": [existing_active], "has_more": False}
 
