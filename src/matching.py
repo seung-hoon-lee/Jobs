@@ -16,11 +16,19 @@ NULL_DEADLINE_URGENCY = 0.3
 DDAY_URGENCY_WINDOW_DAYS = 30
 CAREER_LEVEL_ANY = "경력무관"
 
-# A brand-new posting must clear this relevance score to be admitted. It sits
-# at the floor a single keyword match with a distant deadline produces
-# (for a 2-keyword config: 0.5 * 0.6 + 0.0 * 0.4 = 0.30), so any genuine
-# keyword match qualifies while zero-signal noise is excluded. Raise it to
-# tighten the feed.
+# Keywords are OR-matched: a posting is a candidate if it hits ANY configured
+# keyword, and hitting more raises its rank. Keyword strength saturates at this
+# many distinct matches (1 match -> 0.5, 2+ -> 1.0). Crucially, strength does
+# NOT divide by the total number of configured keywords -- otherwise adding
+# more keywords to widen the net would paradoxically lower every score and
+# admit fewer postings.
+KEYWORD_SATURATION = 2
+
+# A brand-new posting must clear this relevance score to be admitted. At the
+# default, a single keyword match always clears it (0.5 * 0.6 = 0.30), so the
+# real volume controls are per-company dedup + the admission cap below. Raise
+# this (e.g. to 0.5, requiring 2 matches or an imminent deadline) to tighten
+# the feed.
 SCORE_THRESHOLD = 0.3
 
 # Hard ceiling on how many brand-new postings a single run may admit, so a
@@ -84,6 +92,12 @@ def _passes_filters(candidate: JobPosting, config: UserConfig, matched_keywords:
     return True
 
 
+def _keyword_strength(matched_count: int) -> float:
+    # OR-semantics with diminishing returns, independent of how many keywords
+    # are configured (see KEYWORD_SATURATION).
+    return min(1.0, matched_count / KEYWORD_SATURATION)
+
+
 def _dday_urgency(deadline: Optional[date], today: date) -> float:
     if deadline is None:
         return NULL_DEADLINE_URGENCY
@@ -126,7 +140,6 @@ def score_and_rank(
     today: date,
     existing_companies: FrozenSet[str] = frozenset(),
 ) -> List[JobPosting]:
-    total_keywords = len(config.keywords)
     scored: List[JobPosting] = []
 
     for candidate in candidates:
@@ -134,9 +147,9 @@ def score_and_rank(
         if not _passes_filters(candidate, config, matched_keywords):
             continue
 
-        keyword_match_ratio = (len(matched_keywords) / total_keywords) if total_keywords else 0.0
+        keyword_strength = _keyword_strength(len(matched_keywords))
         dday_urgency = _dday_urgency(_parse_deadline(candidate.deadline), today)
-        score = keyword_match_ratio * KEYWORD_WEIGHT + dday_urgency * DDAY_WEIGHT
+        score = keyword_strength * KEYWORD_WEIGHT + dday_urgency * DDAY_WEIGHT
         if score < SCORE_THRESHOLD:
             continue
 
@@ -159,14 +172,12 @@ def rescore(candidates: List[JobPosting], config: UserConfig, today: date) -> Li
     configured keyword substring), the score threshold, the per-company dedup,
     or the admission cap, all of which apply only to brand-new candidates.
     """
-    total_keywords = len(config.keywords)
-
     for candidate in candidates:
         matched_keywords = _matched_keywords(candidate, config.keywords)
-        keyword_match_ratio = (len(matched_keywords) / total_keywords) if total_keywords else 0.0
+        keyword_strength = _keyword_strength(len(matched_keywords))
         dday_urgency = _dday_urgency(_parse_deadline(candidate.deadline), today)
 
         candidate.matched_keywords = matched_keywords
-        candidate.relevance_score = keyword_match_ratio * KEYWORD_WEIGHT + dday_urgency * DDAY_WEIGHT
+        candidate.relevance_score = keyword_strength * KEYWORD_WEIGHT + dday_urgency * DDAY_WEIGHT
 
     return candidates

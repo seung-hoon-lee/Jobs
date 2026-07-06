@@ -29,13 +29,15 @@ def _rolling_posting(url="https://x.com/rolling"):
 def test_score_and_rank_handles_null_deadline_with_fixed_urgency():
     result = score_and_rank([_rolling_posting()], _config(), TODAY)
     assert len(result) == 1
-    assert result[0].relevance_score == 1.0 * 0.6 + NULL_DEADLINE_URGENCY * 0.4
+    # 1 keyword matched -> strength saturates to 0.5 (see KEYWORD_SATURATION)
+    assert result[0].relevance_score == 0.5 * 0.6 + NULL_DEADLINE_URGENCY * 0.4
 
 
 def test_rescore_handles_null_deadline_without_raising():
     result = rescore([_rolling_posting()], _config(), TODAY)
     assert len(result) == 1
-    assert result[0].relevance_score == 1.0 * 0.6 + NULL_DEADLINE_URGENCY * 0.4
+    # 1 keyword matched -> strength saturates to 0.5 (see KEYWORD_SATURATION)
+    assert result[0].relevance_score == 0.5 * 0.6 + NULL_DEADLINE_URGENCY * 0.4
 
 
 class _FakePages:

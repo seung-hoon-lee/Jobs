@@ -68,17 +68,30 @@ def test_dday_urgency_beyond_window_caps_at_zero():
 
 # --- score_and_rank: keyword ratio + filters ---
 
-def test_keyword_match_ratio_and_score():
+def test_keyword_strength_saturates_and_scores():
     # _matched_keywords is a literal case-insensitive substring match against
     # the title, not a translation -- "backend" only matches literal English
     # text, not its Korean equivalent "백엔드".
     config = _config(keywords=["python", "backend", "java"])
-    posting = _posting(title="Python Backend 개발자", deadline=None)
+    posting = _posting(title="Python Backend 개발자", deadline=None)  # matches 2 of 3
     result = score_and_rank([posting], config, TODAY)
     assert len(result) == 1
     assert sorted(result[0].matched_keywords) == ["backend", "python"]
-    expected_score = (2 / 3) * 0.6 + NULL_DEADLINE_URGENCY * 0.4
+    # 2 matches saturates keyword strength at 1.0, regardless of the 3-keyword list
+    expected_score = 1.0 * 0.6 + NULL_DEADLINE_URGENCY * 0.4
     assert result[0].relevance_score == expected_score
+
+
+def test_keyword_strength_independent_of_total_keyword_count():
+    # The bug this guards against: dividing by the total keyword count made a
+    # longer keyword list lower every score, so widening the net admitted
+    # fewer postings. One match must score the same whether the list has 2 or
+    # 20 keywords.
+    a = _posting(title="Python Developer", url="https://x.com/a", deadline=None)
+    b = _posting(title="Python Developer", url="https://x.com/b", deadline=None)
+    short = score_and_rank([a], _config(keywords=["python", "java"]), TODAY)
+    long = score_and_rank([b], _config(keywords=["python"] + [f"kw{i}" for i in range(19)]), TODAY)
+    assert short[0].relevance_score == long[0].relevance_score
 
 
 def test_no_matched_keywords_is_filtered_out():
@@ -179,14 +192,16 @@ def test_empty_optional_filters_allow_everything():
 
 # --- score threshold ---
 
-def test_below_threshold_is_excluded():
-    # Matches 1 of 5 keywords (ratio 0.2 -> 0.12) with a null deadline (0.12):
-    # score 0.24 < SCORE_THRESHOLD, so it's dropped even though a keyword hit.
-    config = _config(keywords=["python", "golang", "rust", "scala", "kotlin"])
-    posting = _posting(title="Python Developer", deadline=None)
+def test_single_keyword_match_meets_threshold_even_with_far_deadline():
+    # 1 match -> strength 0.5 -> 0.30 from keywords; a far-future deadline adds
+    # 0, landing exactly at SCORE_THRESHOLD. So any genuine keyword match is
+    # admitted, and the list length (3 here) doesn't change that.
+    config = _config(keywords=["python", "golang", "rust"])
+    far = date.fromordinal(TODAY.toordinal() + 90)
+    posting = _posting(title="Python Developer", deadline=far.isoformat())
     result = score_and_rank([posting], config, TODAY)
-    assert result == []
-    assert 0.2 * 0.6 + NULL_DEADLINE_URGENCY * 0.4 < SCORE_THRESHOLD
+    assert len(result) == 1
+    assert result[0].relevance_score == SCORE_THRESHOLD
 
 
 # --- per-company dedup ---
