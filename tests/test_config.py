@@ -11,14 +11,13 @@ def _multi_select(name, values):
     return {name: {"multi_select": [{"name": v} for v in values]}}
 
 
-def _row(keywords=("백엔드",), career_levels=(), regions=(), employment_types=(), job_functions=(), watched_companies=()):
+def _row(keywords=("백엔드",), career_levels=(), regions=(), employment_types=(), job_functions=()):
     props = {}
     props.update(_multi_select("키워드", list(keywords)))
     props.update(_multi_select("직무", list(job_functions)))
     props.update(_multi_select("경력", list(career_levels)))
     props.update(_multi_select("지역", list(regions)))
     props.update(_multi_select("채용유형", list(employment_types)))
-    props.update(_multi_select("관심기업", list(watched_companies)))
     return {"properties": props}
 
 
@@ -53,7 +52,6 @@ def test_valid_single_row_returns_user_config():
     client = _fake_client([_row(
         keywords=["백엔드", "파이썬"],
         career_levels=["신입"],
-        watched_companies=["토스"],
     )])
     with patch("src.config.Client", return_value=client):
         config = load_user_config("token", "config-db")
@@ -63,7 +61,6 @@ def test_valid_single_row_returns_user_config():
     assert config.regions == []
     assert config.employment_types == []
     assert config.job_functions == []
-    assert config.watched_companies == ["토스"]
     client.data_sources.query.assert_called_with(data_source_id="config-db", page_size=2)
 
 

@@ -30,7 +30,6 @@ def _settings_row():
     props.update(_multi_select("경력", []))
     props.update(_multi_select("지역", []))
     props.update(_multi_select("채용유형", []))
-    props.update(_multi_select("관심기업", []))
     return {"properties": props}
 
 
@@ -89,7 +88,6 @@ def test_full_pipeline_dedupes_creates_unarchives_and_archives():
              "잡코리아": lambda config: [],
              "직행": MagicMock(side_effect=RuntimeError("site structure changed")),
          }), \
-         patch.object(main.company_pages, "fetch_postings", return_value=[]), \
          patch.object(main, "check_closed", side_effect=lambda url: url == "https://x/active-1"):
         exit_code = main.main()
 

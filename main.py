@@ -8,12 +8,10 @@ logged, and the run still completes and exits 0.
 """
 from __future__ import annotations
 
-import json
 import logging
 import os
 import sys
 from datetime import date
-from pathlib import Path
 from typing import Dict, List, Set
 
 from src.config import ConfigError, load_user_config
@@ -21,28 +19,20 @@ from src.feed_state import FeedState, load_feed_state
 from src.liveness import check_closed, select_recheck_candidates
 from src.matching import rescore, score_and_rank
 from src.notion_sync import sync
-from src.sources import company_pages, jobkorea, saramin, wanted, zighang
+from src.sources import jobkorea, saramin, wanted, zighang
 from src.sources.base import JobPosting
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("main")
 
-# Watched-company (관심기업) career pages need a name -> URL mapping that the
-# Settings DB's 관심기업 multi-select can't carry (it only holds company
-# names). This repo-committed file fills that gap -- e.g.
-# {"토스": "https://boards.greenhouse.io/toss"} -- so URLs can be added
-# without a code change (must stay committed: GitHub Actions only sees
-# what's checked into the repo).
-COMPANY_URLS_PATH = Path(__file__).parent / "company_urls.json"
-
+# Job boards that search across all companies. Company-specific career-page
+# scraping (관심기업) was removed -- these four already cover every employer.
 SOURCE_FETCHERS = {
     "원티드": lambda config: wanted.fetch_postings(),
     "사람인": lambda config: saramin.fetch_postings(config.keywords),
     "잡코리아": lambda config: jobkorea.fetch_postings(),
     "직행": lambda config: zighang.fetch_postings(),
 }
-
-WATCHED_COMPANY_SOURCE = "관심기업"
 
 
 def _require_env(name: str) -> str:
@@ -51,19 +41,6 @@ def _require_env(name: str) -> str:
         logger.error("Missing required environment variable: %s", name)
         sys.exit(1)
     return value
-
-
-def _load_company_urls() -> Dict[str, str]:
-    if not COMPANY_URLS_PATH.exists():
-        return {}
-    try:
-        return json.loads(COMPANY_URLS_PATH.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError) as exc:
-        logger.warning(
-            "Failed to read %s (%s); watched-company scraping skipped this run.",
-            COMPANY_URLS_PATH, exc,
-        )
-        return {}
 
 
 def _dedupe_by_url(postings: List[JobPosting]) -> List[JobPosting]:
@@ -118,15 +95,6 @@ def main() -> int:
             sources_that_failed.add(source_name)
             logger.warning("%s: discovery failed, skipping this source this run: %s", source_name, exc)
 
-    company_urls = _load_company_urls()
-    try:
-        watched_postings = company_pages.fetch_postings(config.watched_companies, company_urls)
-        discovered.extend(watched_postings)
-        logger.info("%s: discovered %d postings", WATCHED_COMPANY_SOURCE, len(watched_postings))
-    except Exception as exc:
-        sources_that_failed.add(WATCHED_COMPANY_SOURCE)
-        logger.warning("%s: discovery failed, skipping this source this run: %s", WATCHED_COMPANY_SOURCE, exc)
-
     discovered = _dedupe_by_url(discovered)
     never_seen, archived_rediscovered = _bucket_discovered(discovered, feed_state)
 
@@ -134,8 +102,17 @@ def main() -> int:
     recheck_candidates = select_recheck_candidates(feed_state, today)
     closed_urls = [url for url in recheck_candidates if check_closed(url)]
 
+    # Companies that already have an active (non-archived) row in the feed, so
+    # "at most one posting per company" holds across the whole feed and not
+    # just within today's newly-discovered batch.
+    existing_companies = frozenset(
+        (row.get("회사명") or "").strip()
+        for row in feed_state.by_url.values()
+        if not row.get("is_archived") and (row.get("회사명") or "").strip()
+    )
+
     # Stage 3: Matching
-    top_new_admissions = score_and_rank(never_seen, config, today)
+    top_new_admissions = score_and_rank(never_seen, config, today, existing_companies)
     rediscovered_admissions = rescore(archived_rediscovered, config, today)
 
     # Stage 4: Notion Sync

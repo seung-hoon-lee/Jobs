@@ -16,7 +16,7 @@ TODAY = date(2026, 7, 2)
 
 
 def _config():
-    return UserConfig(keywords=["python"], job_functions=[], career_levels=[], regions=[], employment_types=[], watched_companies=[])
+    return UserConfig(keywords=["python"], job_functions=[], career_levels=[], regions=[], employment_types=[])
 
 
 def _rolling_posting(url="https://x.com/rolling"):

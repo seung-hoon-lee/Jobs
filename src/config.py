@@ -12,7 +12,6 @@ JOB_FUNCTIONS_PROPERTY = "직무"
 CAREER_LEVELS_PROPERTY = "경력"
 REGIONS_PROPERTY = "지역"
 EMPLOYMENT_TYPES_PROPERTY = "채용유형"
-WATCHED_COMPANIES_PROPERTY = "관심기업"
 
 
 class ConfigError(Exception):
@@ -26,7 +25,6 @@ class UserConfig:
     career_levels: List[str]
     regions: List[str]
     employment_types: List[str]
-    watched_companies: List[str]
 
 
 def _extract_multi_select(properties: dict, prop_name: str) -> List[str]:
@@ -61,5 +59,4 @@ def load_user_config(notion_token: str, config_db_id: str) -> UserConfig:
         career_levels=_extract_multi_select(properties, CAREER_LEVELS_PROPERTY),
         regions=_extract_multi_select(properties, REGIONS_PROPERTY),
         employment_types=_extract_multi_select(properties, EMPLOYMENT_TYPES_PROPERTY),
-        watched_companies=_extract_multi_select(properties, WATCHED_COMPANIES_PROPERTY),
     )

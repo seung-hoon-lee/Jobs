@@ -42,7 +42,7 @@ class JobPosting:
     region: str
     employment_type: str
     career_level: str
-    source: str  # one of 원티드/사람인/잡코리아/직행/관심기업
+    source: str  # one of 원티드/사람인/잡코리아/직행
     matched_keywords: Optional[List[str]] = None
     relevance_score: Optional[float] = None
     # Full posting body text, used for keyword matching alongside title

@@ -28,6 +28,7 @@ STATUS_PROPERTY = "모집상태"
 DISCOVERED_AT_PROPERTY = "discoveredAt"
 LAST_LIVENESS_CHECK_PROPERTY = "lastLivenessCheckAt"
 SOURCE_PROPERTY = "출처"
+COMPANY_PROPERTY = "회사명"
 
 PAGE_SIZE = 100
 
@@ -86,6 +87,12 @@ def _extract_created_time(page: dict, prop_name: str) -> Optional[str]:
     return prop.get("created_time")
 
 
+def _extract_rich_text(page: dict, prop_name: str) -> str:
+    prop = page.get("properties", {}).get(prop_name) or {}
+    parts = prop.get("rich_text") or []
+    return "".join(part.get("plain_text", "") for part in parts)
+
+
 def load_feed_state(notion_token: str, feed_db_id: str) -> FeedState:
     client = Client(auth=notion_token)
 
@@ -104,6 +111,7 @@ def load_feed_state(notion_token: str, feed_db_id: str) -> FeedState:
             "discoveredAt": _extract_created_time(page, DISCOVERED_AT_PROPERTY),
             "lastLivenessCheckAt": _extract_date(page, LAST_LIVENESS_CHECK_PROPERTY),
             "source": _extract_select(page, SOURCE_PROPERTY),
+            "회사명": _extract_rich_text(page, COMPANY_PROPERTY),
         }
 
     return FeedState(by_url=by_url)
